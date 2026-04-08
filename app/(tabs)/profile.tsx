@@ -1,5 +1,8 @@
-import { StyleSheet } from 'react-native';
+// File: app/(tabs)/profile.tsx
+// Author: (cmcfar)/cmcfar@bu.edu
+// Description: This file defines the tab screen for a profile.
 
+import { StyleSheet } from 'react-native';
 import EditScreenInfo from '@/components/EditScreenInfo';
 import { Text, View } from '@/components/Themed';
 

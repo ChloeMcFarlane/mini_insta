@@ -41,24 +41,22 @@ export default function LoginScreen() {
       return;
     }
     setIsLoading(true);
-    setError('');
     try {
-      const response = await fetch('https://cs-webapps.bu.edu/cmcfar/mini_insta/api/login', {
+      const response = await fetch('https://cs-webapps.bu.edu/cmcfar/mini_insta/api/login/', { // Added slash
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
       const data = await response.json();
       if (response.ok) {
+        // Use await to ensure these are saved before navigating
         await AsyncStorage.setItem('userToken', data.token);
         await AsyncStorage.setItem('profileId', data.profile_id.toString());
-        console.log('Login successful. Token saved.');
         router.replace('/(tabs)/feed');
       } else {
-        setError('Login failed. Check your credentials.');
+        setError(data.error || 'Login failed');
       }
     } catch (err) {
-      console.error('Login Error:', err);
       setError('Connection error. Is your server up?');
     } finally {
       setIsLoading(false);

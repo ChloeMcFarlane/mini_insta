@@ -22,46 +22,31 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const MAX_W = Math.min(SCREEN_W, 600);
 
 export default function Feed() {
-  const [isLoading, setIsLoading] = useState(false);
   const [posts, setPosts] = useState([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetchPosts();
-  }, []);
+  
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchPosts();
+    }, [])
+  );
 
   const fetchPosts = async () => {
     setIsLoading(true);
-    setError('');
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      const profileId = await AsyncStorage.getItem('profileId');
+    const token = await AsyncStorage.getItem('userToken');
+    const pId = await AsyncStorage.getItem('profileId');
 
-      // Logged-in: fetch personal feed. Logged-out: fetch global post list.
-      const url = token && profileId
-        ? `https://cs-webapps.bu.edu/cmcfar/mini_insta/api/${profileId}/feed`
-        : `https://cs-webapps.bu.edu/cmcfar/mini_insta/api/profiles`;
+    // Toggle: Authenticated feed vs Public profiles/posts
+    const url = (token && pId) 
+      ? `https://cs-webapps.bu.edu/cmcfar/mini_insta/api/${pId}/feed/` 
+      : `https://cs-webapps.bu.edu/cmcfar/mini_insta/api/profiles/`;
 
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (token) headers['Authorization'] = `Token ${token}`;
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Token ${token}`;
 
-      const response = await fetch(url, { method: 'GET', headers });
-
-      if (!response.ok) {
-        setError('Failed to load posts.');
-        return;
-      }
-
-      const data = await response.json();
-      setPosts(data.results ? data.results : data);
-    } catch (err: any) {
-      console.error('Feed error:', err);
-      setError('Connection error. Is your server up?');
-    } finally {
-      setIsLoading(false);
-    }
+    const res = await fetch(url, { headers });
+    const data = await res.json();
+    setPosts(data);
+    setIsLoading(false);
   };
 
   if (isLoading) {

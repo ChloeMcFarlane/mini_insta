@@ -75,73 +75,27 @@ export default function PostScreen() {
   };
 
   const addPost = async () => {
-    console.log("DEBUG TOKEN:", token);
-    if (!postCap || !image) {
-      setError('Please add an image and a caption');
-      return;
-    }
-    setIsPosting(true);
-    setError('');
-
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-
-      // Guard: token missing at post time (e.g. session expired)
-      if (!token) {
-        setError('Session expired — please log in again.');
-        router.replace('/login');
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('caption', postCap);
-
-      // uri, name, and type are all required for Django's FileField
-      formData.append('image_file', {
-        uri: image,
-        name: 'photo.jpg',
-        type: 'image/jpeg',
-      } as any);
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const response = await fetch(
-        'https://cs-webapps.bu.edu/cmcfar/mini_insta/api/post/create',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Token ${token}`,
-          },
-          body: formData,
-          signal: controller.signal,
-        }
-      );
-
-      clearTimeout(timeout);
-
-      const newPost = await response.json();
-      console.log('Post response status:', response.status);
-      console.log('Post response body:', JSON.stringify(newPost));
-
-      if (response.ok) {
-        console.log('Post created:', newPost);
-        setPostCap('');
-        setImage(null);
-      } else {
-        const detail = newPost?.detail || newPost?.image_file || 'Failed to create post.';
-        setError(String(detail));
-      }
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
-        setError('Request timed out. Is your server up?');
-      } else {
-        console.error('Error creating post:', err);
-        setError('Connection error. Is your server up?');
-      }
-    } finally {
-      setIsPosting(false);
-    }
+    const token = await AsyncStorage.getItem('userToken');
+    const profileId = await AsyncStorage.getItem('profileId');
+    
+    const formData = new FormData();
+    formData.append('profile', profileId); // Django needs the profile ID
+    formData.append('caption', postCap);
+    formData.append('image_file', {
+      uri: Platform.OS === 'ios' ? image.replace('file://', '') : image,
+      name: 'photo.jpg',
+      type: 'image/jpeg',
+    } as any);
+  
+    const response = await fetch('https://cs-webapps.bu.edu/cmcfar/mini_insta/api/post/create/', {
+      method: 'POST',
+      headers: { 'Authorization': `Token ${token}` }, // NO Content-Type here!
+      body: formData,
+    });
+  
+    if (response.ok) router.replace('/feed');
   };
+  
 
   // Show spinner while auth check is in progress
   if (isLoggedIn === null || isPosting) {

@@ -22,64 +22,33 @@ const isTablet = SCREEN_W >= 600;
 const THUMB_SIZE = (SCREEN_W - 3 * 2) / 3;
 
 export default function Profile() {
-  const router = useRouter();
+  const [profile, setProfile] = useState<any>(null);
+  const [posts, setPosts] = useState([]);
 
-  // Redirect to login if no token
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) router.replace('/login');
-    };
-    checkAuth();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadData = async () => {
+        const token = await AsyncStorage.getItem('userToken');
+        const pId = await AsyncStorage.getItem('profileId');
+        
+        // Fetch profile info
+        const pRes = await fetch(`https://cs-webapps.bu.edu/cmcfar/mini_insta/api/profiles/${pId}/`, {
+          headers: { 'Authorization': `Token ${token}` }
+        });
+        setProfile(await pRes.json());
 
-  return (
-    <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Page title */}
-        <Text style={styles.brand}>mini_insta</Text>
-
-        {/* Profile header placeholder */}
-        <View style={styles.profileHeaderWrapper}>
-          {/* Avatar placeholder */}
-          <View style={styles.avatarPlaceholder} />
-
-          {/* Username placeholder */}
-          <Text style={styles.username}>username</Text>
-
-          {/* Metrics row */}
-          <View style={styles.metricsRow}>
-            <View style={styles.metricItemBordered}>
-              <Text style={styles.metricCount}>—</Text>
-              <Text style={styles.metricLabel}>posts</Text>
-            </View>
-            <View style={styles.metricItemBordered}>
-              <Text style={styles.metricCount}>—</Text>
-              <Text style={styles.metricLabel}>followers</Text>
-            </View>
-            <View style={styles.metricItem}>
-              <Text style={styles.metricCount}>—</Text>
-              <Text style={styles.metricLabel}>following</Text>
-            </View>
-          </View>
-
-          {/* Divider */}
-          <View style={styles.divider} />
-
-          {/* Bio area */}
-          <Text style={styles.aboutTitle}>About Me</Text>
-          <Text style={styles.bioText}>Bio will appear here once data fetching is wired up.</Text>
-        </View>
-
-        {/* Posts grid placeholder */}
-        <View style={styles.postsGrid}>
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <View key={i} style={styles.postThumb} />
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        // Fetch user's own posts
+        const postRes = await fetch(`https://cs-webapps.bu.edu/cmcfar/mini_insta/api/${pId}/posts/`, {
+          headers: { 'Authorization': `Token ${token}` }
+        });
+        setPosts(await postRes.json());
+      };
+      loadData();
+    }, [])
   );
+
+  // Render profile header using profile.display_name, profile.follower_count etc.
+  // Render grid using FlatList with numColumns={3}
 }
 
 const styles = StyleSheet.create({

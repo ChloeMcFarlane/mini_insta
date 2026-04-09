@@ -3,7 +3,7 @@
  * Author: (cmcfar)/cmcfar@bu.edu
  * Description: React Native stylesheet that mirrors the CSS styling from the
  * mini_insta Django web app. Designed to be responsive across phone and iPad.
- *
+ * CONVERSATION USED TO GENERATE STYLING FOR THIS FILE: https://claude.ai/share/9cd36580-8d68-40fd-88e0-dbbae15d1ab0
  * Usage:
  *   import S from '@/assets/styles/styles';
  *   // Then use S.container, S.title, etc.

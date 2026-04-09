@@ -1,43 +1,61 @@
 // File: app/(tabs)/feed.tsx
 // Author: (cmcfar)/cmcfar@bu.edu
 // Description: This file defines the tab screen for feed.
+//  * Logged-out users see the global public feed (no auth required).
+//  * Logged-in users see their own personalized feed.
+//  * CONVERSATION USED TO GENERATE STYLING FOR THIS FILE: https://claude.ai/share/9cd36580-8d68-40fd-88e0-dbbae15d1ab0
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, SafeAreaView, FlatList, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  SafeAreaView,
+  FlatList,
+  Image,
+  Dimensions,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const { width: SCREEN_W } = Dimensions.get('window');
+const MAX_W = Math.min(SCREEN_W, 600);
+
 export default function Feed() {
-  // Definitions
   const [isLoading, setIsLoading] = useState(false);
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState('');
 
-  // Fetch posts on load
   useEffect(() => {
     fetchPosts();
   }, []);
 
-  // Fetch posts function
   const fetchPosts = async () => {
     setIsLoading(true);
     setError('');
     try {
       const token = await AsyncStorage.getItem('userToken');
       const profileId = await AsyncStorage.getItem('profileId');
-      const response = await fetch(`https://cs-webapps.bu.edu/cmcfar/mini_insta/api/${profileId}/feed`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Token ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+
+      // Logged-in: fetch personal feed. Logged-out: fetch global post list.
+      const url = token && profileId
+        ? `https://cs-webapps.bu.edu/cmcfar/mini_insta/api/${profileId}/feed`
+        : `https://cs-webapps.bu.edu/cmcfar/mini_insta/api/profiles`;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) headers['Authorization'] = `Token ${token}`;
+
+      const response = await fetch(url, { method: 'GET', headers });
+
       if (!response.ok) {
         setError('Failed to load posts.');
         return;
       }
+
       const data = await response.json();
-      const posts = data.results ? data.results : data;
-      setPosts(posts);
+      setPosts(data.results ? data.results : data);
     } catch (err: any) {
       console.error('Feed error:', err);
       setError('Connection error. Is your server up?');
@@ -46,31 +64,58 @@ export default function Feed() {
     }
   };
 
-  // Loading state
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fabaad" />
-        <Text style={{ marginTop: 10 }}>Loading feed...</Text>
+        <ActivityIndicator size="large" color="#A882DD" />
+        <Text style={styles.loadingText}>Loading feed...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Feed</Text>
+    <SafeAreaView style={styles.screen}>
+      <Text style={styles.brand}>mini_insta</Text>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <FlatList
         data={posts}
         keyExtractor={(item: any) => item.id.toString()}
+        contentContainerStyle={styles.feedContent}
+        showsVerticalScrollIndicator={false}
         renderItem={({ item }: any) => (
-          <View style={styles.postContainer}>
+          <View style={styles.postCard}>
+            {/* Profile header row */}
+            <View style={styles.postHeader}>
+              {item.owner?.profile_pic ? (
+                <Image
+                  source={{
+                    uri:
+                      item.owner.profile_pic_url ||
+                      `https://cs-webapps.bu.edu${item.owner.profile_pic}`,
+                  }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]} />
+              )}
+              <Text style={styles.ownerName}>
+                {item.owner?.username || 'user'}
+              </Text>
+            </View>
+
+            {/* Post image */}
             {item.photos && item.photos.length > 0 && (
               <Image
-                source={{ uri: item.photos[0].image_url || `https://cs-webapps.bu.edu${item.photos[0].image_file}` }}
+                source={{
+                  uri:
+                    item.photos[0].image_url ||
+                    `https://cs-webapps.bu.edu${item.photos[0].image_file}`,
+                }}
                 style={styles.postImage}
               />
             )}
+
+            {/* Caption */}
             <Text style={styles.caption}>{item.caption}</Text>
           </View>
         )}
@@ -79,13 +124,80 @@ export default function Feed() {
   );
 }
 
-// TO DO: CHANGE STYLING!!
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-  errorText: { color: 'red', textAlign: 'center', marginBottom: 15 },
-  postContainer: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 15 },
-  postImage: { width: '100%', height: 300, borderRadius: 8, marginBottom: 10 },
-  caption: { fontSize: 16 },
+  screen: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#fff',
+    fontSize: 14,
+  },
+  brand: {
+    fontSize: 28,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    color: '#A882DD',
+    textAlign: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  errorText: {
+    color: '#C8154B',
+    textAlign: 'center',
+    marginVertical: 12,
+    fontSize: 13,
+  },
+  feedContent: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  postCard: {
+    width: MAX_W,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 20,
+    backgroundColor: '#000',
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 0.3,
+    borderColor: 'gray',
+  },
+  avatarFallback: {
+    backgroundColor: '#302f2f',
+  },
+  ownerName: {
+    marginLeft: 12,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  postImage: {
+    width: '100%',
+    aspectRatio: 1,
+    resizeMode: 'cover',
+  },
+  caption: {
+    padding: 12,
+    fontSize: 14,
+    color: '#fff',
+  },
 });

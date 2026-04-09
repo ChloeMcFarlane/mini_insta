@@ -75,6 +75,10 @@ export default function PostScreen() {
   };
 
   const addPost = async () => {
+    if (!image) {
+      setError('Please select an image first');
+      return;
+    }
     const token = await AsyncStorage.getItem('userToken');
     const profileId = await AsyncStorage.getItem('profileId');
     
@@ -87,7 +91,7 @@ export default function PostScreen() {
       type: 'image/jpeg',
     } as any);
   
-    const response = await fetch('https://cs-webapps.bu.edu/cmcfar/mini_insta/api/post/create/', {
+    const response = await fetch('https://cs-webapps.bu.edu/cmcfar/mini_insta/api/post/create', {
       method: 'POST',
       headers: { 'Authorization': `Token ${token}` }, // NO Content-Type here!
       body: formData,

@@ -5,7 +5,8 @@
 //  * NOTE: Data fetching to be wired up in a future session.
 //  * CONVERSATION USED TO GENERATE STYLING FOR THIS FILE: https://claude.ai/share/9cd36580-8d68-40fd-88e0-dbbae15d1ab0
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -32,13 +33,13 @@ export default function Profile() {
         const pId = await AsyncStorage.getItem('profileId');
         
         // Fetch profile info
-        const pRes = await fetch(`https://cs-webapps.bu.edu/cmcfar/mini_insta/api/profiles/${pId}/`, {
+        const pRes = await fetch(`https://cs-webapps.bu.edu/cmcfar/mini_insta/api/profiles/${pId}`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         setProfile(await pRes.json());
 
         // Fetch user's own posts
-        const postRes = await fetch(`https://cs-webapps.bu.edu/cmcfar/mini_insta/api/${pId}/posts/`, {
+        const postRes = await fetch(`https://cs-webapps.bu.edu/cmcfar/mini_insta/api/${pId}/posts`, {
           headers: { 'Authorization': `Token ${token}` }
         });
         setPosts(await postRes.json());

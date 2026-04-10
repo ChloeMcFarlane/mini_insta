@@ -1,11 +1,10 @@
 // File: app/(tabs)/post.tsx
 // Author: (cmcfar)/cmcfar@bu.edu
-// Description: This file defines the tab screen for creating a post.
-//  * If the user is not logged in, they are redirected to the login screen.
-//  * CONVERSATION USED TO GENERATE STYLING FOR THIS FILE: https://claude.ai/share/9cd36580-8d68-40fd-88e0-dbbae15d1ab0
+// Description: Create post screen with auth check, image upload, and image URL fallback.
 
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Text, ActivityIndicator, SafeAreaView, Alert, Image, ScrollView, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { View,TextInput,TouchableOpacity,StyleSheet,Text,ActivityIndicator,Alert,Image,ScrollView,KeyboardAvoidingView,Platform,Dimensions,} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -17,87 +16,148 @@ export default function PostScreen() {
   const router = useRouter();
 
   const [image, setImage] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrlFocused, setImageUrlFocused] = useState(false);
   const [error, setError] = useState('');
   const [postCap, setPostCap] = useState('');
   const [isPosting, setIsPosting] = useState(false);
   const [capFocused, setCapFocused] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Check auth on mount — redirect to login if no token
+  // Check auth on mount
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        setIsLoggedIn(false);
-        router.replace('/login');
-      } else {
-        setIsLoggedIn(true);
-      }
-    };
-    checkAuth();
+    AsyncStorage.getItem('userToken').then(token => {
+      setIsLoggedIn(!!token);
+      setAuthChecked(true);
+    });
   }, []);
 
   const handleRefresh = () => {
     setImage(null);
+    setImageUrl('');
     setPostCap('');
     setError('');
   };
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert('Permission required', 'Permission to access the media library is required.');
+    const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!granted) {
+      Alert.alert('Permission required', 'Please allow access to your photo library.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
+      aspect: [1, 1],
+      quality: 0.8,
     });
     if (!result.canceled) {
       setImage(result.assets[0].uri);
+      setImageUrl(''); // clear URL if file is picked
+      setError('');
     }
   };
 
   const addPost = async () => {
-    if (!image) {
-      setError('Please select an image first');
+    if (!image && !imageUrl) {
+      setError('Please select an image or enter an image URL');
       return;
     }
-    const token = await AsyncStorage.getItem('userToken');
-    const profileId = await AsyncStorage.getItem('profileId');
-    
-    const formData = new FormData();
-    formData.append('profile', profileId); // Django needs the profile ID
-    formData.append('caption', postCap);
-    formData.append('image_file', {
-      uri: Platform.OS === 'ios' ? image.replace('file://', '') : image,
-      name: 'photo.jpg',
-      type: 'image/jpeg',
-    } as any);
-  
-    const response = await fetch('https://cs-webapps.bu.edu/cmcfar/mini_insta/api/post/create', {
-      method: 'POST',
-      headers: { 'Authorization': `Token ${token}` }, // NO Content-Type here!
-      body: formData,
-    });
-  
-    if (response.ok) router.replace('/feed');
-  };
-  
+    setIsPosting(true);
+    setError('');
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const profileId = await AsyncStorage.getItem('profileId');
 
-  // Show spinner while auth check is in progress
-  if (isLoggedIn === null || isPosting) {
+      const formData = new FormData();
+      formData.append('profile', profileId as string);
+      formData.append('caption', postCap);
+
+      if (image) {
+        // File upload path
+        formData.append('image_file', {
+          uri: Platform.OS === 'ios' ? image.replace('file://', '') : image,
+          name: 'photo.jpg',
+          type: 'image/jpeg',
+        } as any);
+      } else if (imageUrl) {
+        // URL path
+        formData.append('image_url', imageUrl);
+      }
+
+      const response = await fetch(
+        'https://cs-webapps.bu.edu/cmcfar/mini_insta/api/post/create',
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Token ${token}` },
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+      console.log('Post status:', response.status, 'data:', JSON.stringify(data));
+
+      if (response.ok) {
+        setImage(null);
+        setImageUrl('');
+        setPostCap('');
+        Alert.alert('Success!', 'Your post was created!', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)/feed') }
+        ]);
+      } else {
+        setError('Failed: ' + JSON.stringify(data));
+      }
+    } catch (err: any) {
+      console.error('Post error:', err);
+      setError('Connection error: ' + err.message);
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  // Still checking auth
+  if (!authChecked) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#A882DD" />
-        <Text style={styles.loadingText}>
-          {isPosting ? 'Uploading your post...' : 'Loading...'}
-        </Text>
       </SafeAreaView>
     );
   }
+
+  // Not logged in
+  if (!isLoggedIn) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.notLoggedInContainer}>
+          <Text style={styles.title}>Create Post</Text>
+          <Text style={styles.notLoggedInText}>
+            You need to be logged in to create a post.
+          </Text>
+          <TouchableOpacity
+            style={styles.btnLogin}
+            onPress={() => router.replace('/login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.btnLoginText}>Go to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Posting spinner
+  if (isPosting) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#A882DD" />
+        <Text style={styles.loadingText}>Uploading your post...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const hasImage = !!image || !!imageUrl;
+  const previewUri = image || (imageUrl || null);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -113,21 +173,58 @@ export default function PostScreen() {
           <Text style={styles.title}>Create Post</Text>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          {/* Image picker section */}
+          {/* Image picker */}
           <Text style={styles.sectionLabel}>Photo</Text>
           <View style={styles.imageContainer}>
-            <TouchableOpacity style={styles.pickBtn} onPress={pickImage} activeOpacity={0.8}>
-              <Text style={styles.pickBtnText}>Pick an image from camera roll</Text>
+            <TouchableOpacity
+              style={styles.pickBtn}
+              onPress={pickImage}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.pickBtnText}>
+                {image ? 'Change Photo' : 'Pick from Camera Roll'}
+              </Text>
             </TouchableOpacity>
-            {image && (
-              <Image source={{ uri: image }} style={styles.preview} />
-            )}
           </View>
 
-          {/* Caption input */}
+          {/* OR divider */}
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.orLine} />
+          </View>
+
+          {/* Image URL input */}
+          <Text style={styles.sectionLabel}>Paste an Image URL</Text>
+          <TextInput
+            style={[styles.input, imageUrlFocused && styles.inputFocused]}
+            placeholder="https://example.com/photo.jpg"
+            placeholderTextColor="rgb(140,137,137)"
+            value={imageUrl}
+            onChangeText={(text) => {
+              setImageUrl(text);
+              if (text) setImage(null); // clear file if URL is typed
+            }}
+            autoCapitalize="none"
+            keyboardType="url"
+            onFocus={() => setImageUrlFocused(true)}
+            onBlur={() => setImageUrlFocused(false)}
+          />
+
+          {/* Preview */}
+          {previewUri ? (
+            <View style={styles.previewContainer}>
+              <Image
+                source={{ uri: previewUri }}
+                style={styles.preview}
+              />
+            </View>
+          ) : null}
+
+          {/* Caption */}
           <Text style={styles.sectionLabel}>Caption</Text>
           <TextInput
-            style={[styles.input, capFocused && styles.inputFocused]}
+            style={[styles.input, styles.captionInput, capFocused && styles.inputFocused]}
             placeholder="Add a caption..."
             placeholderTextColor="rgb(140,137,137)"
             value={postCap}
@@ -138,12 +235,21 @@ export default function PostScreen() {
             onBlur={() => setCapFocused(false)}
           />
 
-          {/* Action buttons */}
+          {/* Buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.btnPost} onPress={addPost} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={[styles.btnPost, !hasImage && styles.btnDisabled]}
+              onPress={addPost}
+              activeOpacity={hasImage ? 0.8 : 1}
+              disabled={!hasImage}
+            >
               <Text style={styles.btnPostText}>Create Post</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btnCancel} onPress={handleRefresh} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.btnCancel}
+              onPress={handleRefresh}
+              activeOpacity={0.8}
+            >
               <Text style={styles.btnCancelText}>Reset</Text>
             </TouchableOpacity>
           </View>
@@ -168,6 +274,33 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#fff',
     fontSize: 14,
+  },
+  notLoggedInContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 28,
+  },
+  notLoggedInText: {
+    color: 'rgb(140,137,137)',
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  btnLogin: {
+    backgroundColor: '#bc9ee6',
+    borderWidth: 1,
+    borderColor: '#A882DD',
+    borderRadius: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  btnLoginText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   container: {
     flexGrow: 1,
@@ -200,7 +333,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   pickBtn: {
     backgroundColor: '#bc9ee6',
@@ -216,10 +349,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#333',
+  },
+  orText: {
+    color: 'rgb(140,137,137)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginHorizontal: 12,
+  },
+  previewContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   preview: {
     width: isTablet ? 400 : 300,
     height: isTablet ? 300 : 225,
-    marginTop: 16,
     borderRadius: 8,
   },
   input: {
@@ -231,7 +383,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  captionInput: {
     textAlignVertical: 'top',
     minHeight: 80,
   },
@@ -256,6 +410,10 @@ const styles = StyleSheet.create({
     borderColor: '#A882DD',
     borderRadius: 8,
     alignItems: 'center',
+  },
+  btnDisabled: {
+    backgroundColor: '#555',
+    borderColor: '#444',
   },
   btnPostText: {
     color: '#fff',

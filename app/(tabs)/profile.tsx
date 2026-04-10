@@ -3,6 +3,9 @@
 // Description: This file defines the tab screen for creating a user's profile.
 //  * If the user is not logged in, they are redirected to the login screen.
 //  * CONVERSATION USED TO GENERATE STYLING FOR THIS FILE: https://claude.ai/share/9cd36580-8d68-40fd-88e0-dbbae15d1ab0
+// NOTE: TO TEST LOGIN, USE THESE CREDENTIALS: 
+//   Username: addybaddy
+//   Password: PeachesAndCream!23
 
 import React, { useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';

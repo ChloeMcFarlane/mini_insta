@@ -1,0 +1,5 @@
+https://cs-webapps.bu.edu/cmcfar/mini_insta/api/profiles/
+
+NOTE:
+- I did not implement a base as, there is no assocation required or relevant for the base api
+- Additionally, I wanted to keep all api links clear and cohesive, assigning each url the correct naming structure to reduce bugs
